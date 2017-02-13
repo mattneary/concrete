@@ -1,20 +1,51 @@
 import {
   includes, compose, map, reduce, concat,
 } from 'lodash/fp'
-import {listSplit} from './utils'
+import {listSplit, getSignature, splitArgs, splitStatements} from './utils'
 import structureParse from './structure'
 
-const getSignature = x => x.map(({type, delim}) => type === 'group' ? delim : type)
+const hasInfix = signature =>
+  signature.length === 3 && signature[1] === 'punctuation'
+const hasPrefix = signature =>
+  signature.length === 2 && signature[0] === 'punctuation'
 
-const splitArgs = listSplit(({type, value}) => type === 'punctuation' && value === ',')
+const groupOperators = x => {
+  const precedence = {
+    '*': 0,
+    '+': 1,
+  }
+  const prefix = ['-']
+  const signature = getSignature(x)
+  if (hasInfix(signature) || hasPrefix(signature)) return x
+  if (signature[1] === 'punctuation' && signature[3] === 'punctuation') {
+    return groupOperators(
+      precedence[x[1].value] < precedence[x[3].value]
+        ? [{type: 'group', delim: '(', value: x.slice(0, 3)}, ...x.slice(3)]
+        : [...x.slice(0, 2), {type: 'group', delim: '(', value: x.slice(2, 5)}, ...x.slice(5)]
+    )
+  } else if (signature[0] === 'punctuation' && signature[2] === 'punctuation') {
+    return groupOperators(
+      precedence[x[0].value] < precedence[x[2].value]
+        ? [{type: 'group', delim: '(', value: x.slice(0, 2)}, ...x.slice(2)]
+        : [x[0], {type: 'group', delim: '(', value: x.slice(1, 4)}, ...x.slice(4)]
+    )
+  }
+  throw new Error('Operator usage could not be understood.')
+}
 
 const infix = x => {
   const signature = getSignature(x)
-  // TODO: operator precedence and unary operators
-  if (signature.length === 3 && signature[1] === 'punctuation') {
-    return {type: 'infix', left: expression(x[0]), right: expression(x[2])}
+  if (hasInfix(signature)) {
+    return {type: 'infix', op: x[1].value, left: expression(x[0]), right: expression(x[2])}
+  } else if (hasPrefix(signature)) {
+    return {type: 'prefix', op: x[0].value, operand: expression(x[1])}
   }
-  throw new Error('Could not parse operators')
+  const grouped = groupOperators(x)
+  const newSignature = getSignature(grouped)
+  if (!hasInfix(newSignature) && !hasPrefix(newSignature)) {
+    throw new Error('Operator usage could not be understood.')
+  }
+  return infix(grouped)
 }
 
 const expression = x => {
@@ -45,16 +76,7 @@ const expression = x => {
   throw new Error('Could not parse')
 }
 
-const script = x => {
-  const splitStatements = compose(
-    reduce(concat, []),
-    map(listSplit(
-      ({type, value}) => type === 'punctuation' && value === ';',
-    )),
-    listSplit(({type}) => type === 'linebreak', x),
-  )
-  return splitStatements(x).map(expression)
-}
+const script = x => splitStatements(x).map(expression)
 
 const parse = compose(script, structureParse)
 export default parse

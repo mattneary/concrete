@@ -32,3 +32,10 @@ export const listSplit = delim => xs => {
   if (currentList.length) lists.push(currentList)
   return lists
 }
+
+export const getSignature = x => x.map(({type, delim}) => type === 'group' ? delim : type)
+export const splitArgs = listSplit(({type, value}) => type === 'punctuation' && value === ',')
+export const splitStatements = listSplit(({type, value}) => (
+  (type === 'punctuation' && value === ';') ||
+  (type === 'linebreak')
+))
