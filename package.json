@@ -1,0 +1,29 @@
+{
+  "name": "WIP",
+  "version": "0.0.0",
+  "description": "",
+  "main": "lib",
+  "scripts": {
+    "test": "nyc ava",
+    "lint": "eslint src test",
+    "prebuild": "rm -rf lib",
+    "build": "babel src -sd lib"
+  },
+  "files": [
+    "lib"
+  ],
+  "license": "UNLICENSED",
+  "author": "Matt Neary <neary.matt@gmail.com> (http://mattneary.com)",
+  "repository": "",
+  "devDependencies": {
+    "ava": "^0.18.0",
+    "babel-cli": "^6.22.2",
+    "babel-preset-kensho": "^2.0.0",
+    "eslint": "^3.14.1",
+    "eslint-config-kensho": "^1.0.0",
+    "nyc": "^10.1.2"
+  },
+  "dependencies": {
+    "lodash": "^4.17.4"
+  }
+}

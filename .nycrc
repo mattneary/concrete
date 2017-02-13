@@ -1,0 +1,9 @@
+{
+  "exclude": [
+    "test"
+  ],
+  "reporter": [
+    "text-summary",
+    "html"
+  ]
+}
