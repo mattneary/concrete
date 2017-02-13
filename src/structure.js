@@ -1,7 +1,7 @@
 import {
-  includes, assign, toArray, fromPairs, invertObj, compose, flatten, set, last,
+  assign, toArray, fromPairs, invertObj, compose, flatten, set, last,
 } from 'lodash/fp'
-import {breakAt, listSplit} from './utils'
+import {breakAt} from './utils'
 
 const quoteLang = {
   literal: value => ({type: 'literal', value}),

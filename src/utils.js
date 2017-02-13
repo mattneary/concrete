@@ -18,7 +18,7 @@ export const breakAt = (strs, x) => {
   )
 }
 
-export const listSplit = (delim, xs) => {
+export const listSplit = delim => xs => {
   const lists = []
   let currentList = []
   xs.forEach(x => {
