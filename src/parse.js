@@ -6,6 +6,8 @@ import structureParse from './structure'
 
 const getSignature = x => x.map(({type, delim}) => type === 'group' ? delim : type)
 
+const splitArgs = listSplit(({type, value}) => type === 'punctuation' && value === ',')
+
 const infix = x => {
   const signature = getSignature(x)
   // TODO: operator precedence and unary operators
@@ -14,12 +16,16 @@ const infix = x => {
   }
   throw new Error('Could not parse operators')
 }
+
 const expression = x => {
   if (!Array.isArray(x)) {
-    // The bare token base-case. If it's paren-wrapped, recurse on its
+    // The bare token base-case. If it's bracket-wrapped, recurse on its
     // contents. Otherwise, return it.
-    const {type, value} = x
-    if (type === 'group') return expression(value)
+    const {type, value, delim} = x
+    if (type === 'group') {
+      if (delim === '(') return expression(value)
+      return {type: 'list', value: splitArgs(value).map(expression)}
+    }
     return x
   }
   if (x.length === 1) {
@@ -30,7 +36,6 @@ const expression = x => {
   const signature = getSignature(exprs)
   if (includes('punctuation', signature)) return infix(x)
   if (signature.length === 2 && signature[1] === '(') {
-    const splitArgs = listSplit(({type, value}) => type === 'punctuation' && value === ',')
     return {
       type: 'invocation',
       fn: expression(exprs[0]),

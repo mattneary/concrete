@@ -14,3 +14,4 @@ test('parse', parses, `
  A + 2
  1
 `)
+test('parse', parses, '[A, 1, "ABC"]')
