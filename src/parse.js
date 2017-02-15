@@ -1,82 +1,136 @@
 import {
-  includes, compose, map, reduce, concat,
+  assign, toArray, fromPairs, invertObj, compose, flatten, set, last,
 } from 'lodash/fp'
-import {listSplit, getSignature, splitArgs, splitStatements} from './utils'
-import structureParse from './structure'
+import {breakAt} from './utils'
 
-const hasInfix = signature =>
-  signature.length === 3 && signature[1] === 'punctuation'
-const hasPrefix = signature =>
-  signature.length === 2 && signature[0] === 'punctuation'
-
-const groupOperators = x => {
-  const precedence = {
-    '*': 0,
-    '+': 1,
-  }
-  const prefix = ['-']
-  const signature = getSignature(x)
-  if (hasInfix(signature) || hasPrefix(signature)) return x
-  if (signature[1] === 'punctuation' && signature[3] === 'punctuation') {
-    return groupOperators(
-      precedence[x[1].value] < precedence[x[3].value]
-        ? [{type: 'group', delim: '(', value: x.slice(0, 3)}, ...x.slice(3)]
-        : [...x.slice(0, 2), {type: 'group', delim: '(', value: x.slice(2, 5)}, ...x.slice(5)]
-    )
-  } else if (signature[0] === 'punctuation' && signature[2] === 'punctuation') {
-    return groupOperators(
-      precedence[x[0].value] < precedence[x[2].value]
-        ? [{type: 'group', delim: '(', value: x.slice(0, 2)}, ...x.slice(2)]
-        : [x[0], {type: 'group', delim: '(', value: x.slice(1, 4)}, ...x.slice(4)]
-    )
-  }
-  throw new Error('Operator usage could not be understood.')
+const quoteLang = {
+  literal: value => ({type: 'literal', value}),
+  nonliteral: value => ({type: 'nonliteral', value}),
 }
 
-const infix = x => {
-  const signature = getSignature(x)
-  if (hasInfix(signature)) {
-    return {type: 'infix', op: x[1].value, left: expression(x[0]), right: expression(x[2])}
-  } else if (hasPrefix(signature)) {
-    return {type: 'prefix', op: x[0].value, operand: expression(x[1])}
-  }
-  const grouped = groupOperators(x)
-  const newSignature = getSignature(grouped)
-  if (!hasInfix(newSignature) && !hasPrefix(newSignature)) {
-    throw new Error('Operator usage could not be understood.')
-  }
-  return infix(grouped)
+const delimLang = {
+  ...quoteLang,
+  group: (delim, value) => ({type: 'group', delim, value}),
 }
 
-const expression = x => {
-  if (!Array.isArray(x)) {
-    // The bare token base-case. If it's bracket-wrapped, recurse on its
-    // contents. Otherwise, return it.
-    const {type, value, delim} = x
-    if (type === 'group') {
-      if (delim === '(') return expression(value)
-      return {type: 'list', value: splitArgs(value).map(expression)}
+const tokenLang = {
+  group: delimLang.group,
+  string: value => ({type: 'string', value}),
+  number: value => ({type: 'number', value}),
+  punctuation: value => ({type: 'punctuation', value}),
+  linebreak: value => ({type: 'linebreak', value}),
+  symbol: value => ({type: 'symbol', value}),
+}
+
+const parseTokens = exprs => {
+  const tokenGroups = [
+    ['number', /[0-9]+("."[0-9]+)?/],
+    ['symbol', /[A-Za-z_][A-Za-z0-9_]*/],
+    ['linebreak', /\n+/],
+    ['punctuation', /[^A-Za-z0-9_]/],
+  ]
+  const tokenize = x => {
+    if (x === '') return []
+    if (x.match(/^[ \t]+/)) return tokenize(x.replace(/^[ \t]+/, ''))
+    for (let i = 0; i < tokenGroups.length; i += 1) {
+      const [type, pattern] = tokenGroups[i]
+      const match = x.match(pattern)
+      if (match && match.index === 0) {
+        return [
+          tokenLang[type](match[0]),
+          ...tokenize(x.substr(match[0].length)),
+        ]
+      }
     }
-    return x
+    throw new Error('Expected token')
   }
-  if (x.length === 1) {
-    // Single token expressions evaluate to their only token.
-    return expression(x[0])
-  }
-  const exprs = x.filter(({type}) => type !== 'linebreak')
-  const signature = getSignature(exprs)
-  if (includes('punctuation', signature)) return infix(x)
-  if (signature.length === 2 && signature[1] === '(') {
-    return {
-      type: 'invocation',
-      fn: expression(exprs[0]),
-      args: splitArgs(exprs[1].value).map(expression),
-    }
-  }
-  throw new Error('Could not parse')
+
+  return flatten(exprs.map(({type, value, ...rest}) => {
+    if (type === 'literal') return [tokenLang.string(value)]
+    if (type === 'group') return [{type, value: parseTokens(value), ...rest}]
+    return tokenize(value)
+  }))
 }
 
-const script = x => splitStatements(x).map(expression)
+const parseDelims = delims => x => {
+  const isDelim = c => delims.join('').indexOf(c) !== -1
+  const isOpen = c => isDelim(c) && delims.join('').indexOf(c) % 2 === 0
+  const obverse = assign(
+    fromPairs(delims.map(toArray)),
+    invertObj(fromPairs(delims.map(toArray))),
+  )
 
-const parse = compose(script, structureParse)
+  const lexed = flatten(x.map(({type, value}) => {
+    if (type === 'literal') return [{type, value}]
+    return breakAt(toArray(delims.join('')), value).map(substr => ({
+      type, value: substr,
+    }))
+  }))
+
+  let tokens = []
+  const stack = []
+  const path = [0]
+  lexed.forEach(({type, value}) => {
+    if (isOpen(value)) {
+      stack.push(value)
+      tokens = set(path, delimLang.group(value, []), tokens)
+      path.push('value', 0)
+    } else if (isDelim(value)) {
+      if (last(stack) === obverse[value]) {
+        path.pop()
+        path.pop()
+        path.push(path.pop() + 1)
+        stack.pop()
+      } else {
+        throw Error(`Unexpected ${value}, expected ${obverse[last(stack)]} first.`)
+      }
+    } else {
+      tokens = set(path, {type, value}, tokens)
+      path.push(path.pop() + 1)
+    }
+  })
+  return tokens
+}
+
+const parseQuotes = x => {
+  const tokens = []
+  let inQuote = false
+  let inEscape = false
+  let currentToken = ''
+  Array.from(x).forEach(c => {
+    if (c === '\\') {
+      if (inQuote) {
+        inEscape = true
+      } else {
+        throw Error('slash is invalid outside of literals')
+      }
+    } else if (c === '"' && inQuote) {
+      if (inEscape) {
+        currentToken += c
+      } else {
+        inQuote = false
+        tokens.push(quoteLang.literal(currentToken))
+        currentToken = ''
+      }
+      inEscape = false
+    } else if (c === '"') {
+      tokens.push(quoteLang.nonliteral(currentToken))
+      currentToken = ''
+      inQuote = true
+    } else {
+      currentToken += c
+    }
+  })
+  if (inEscape) throw Error('Cannot end expression in slash')
+  if (inQuote) throw Error('Unterminated string')
+  if (currentToken.length) tokens.push(quoteLang.nonliteral(currentToken))
+  return tokens
+}
+
+const parse = compose(
+  parseTokens,
+  parseDelims(['()', '[]']),
+  parseQuotes,
+)
+
 export default parse
