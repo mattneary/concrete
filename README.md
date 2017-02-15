@@ -8,6 +8,7 @@ standard AST (more aptly, *Concrete* Syntax Tree) to yours.
 The concrete syntax tree is as follows.
 
 ```js
+tree : [expr]
 expr : group | string | number | punctuation | linebreak | symbol
 group : {type: 'group', value : [expr], delim: '(' | '[' | '{'}
 string : {type: 'string', value : string}
