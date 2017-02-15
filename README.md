@@ -17,3 +17,5 @@ punctuation : {type: 'punctuation', value : string}
 linebreak : {type: 'punctuation', value : string}
 symbol : {type: 'string', value : string}
 ```
+
+See the `test/` directory for an example of parsing lisp.
