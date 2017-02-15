@@ -10,7 +10,7 @@ const parseLisp = s => {
     const {type, value, delim} = x
     if (type === 'group') {
       if (delim !== '(') throw new Error('That\'s not lisp!')
-      return value.map(translate)
+      return translate(value)
     }
     if (type === 'string') return JSON.stringify(value)
     return value
