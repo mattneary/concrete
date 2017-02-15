@@ -42,7 +42,7 @@ const parseTokens = exprs => {
         ]
       }
     }
-    throw new Error('Expected token')
+    throw new Error(`Expected a valid token, found ${x}.`)
   }
 
   return flatten(exprs.map(({type, value, ...rest}) => {
@@ -102,7 +102,7 @@ const parseQuotes = x => {
       if (inQuote) {
         inEscape = true
       } else {
-        throw Error('slash is invalid outside of literals')
+        throw Error('slash is invalid outside of strings')
       }
     } else if (c === '"' && inQuote) {
       if (inEscape) {
@@ -121,7 +121,7 @@ const parseQuotes = x => {
       currentToken += c
     }
   })
-  if (inEscape) throw Error('Cannot end expression in slash')
+  if (inEscape) throw Error('Cannot end string in slash')
   if (inQuote) throw Error('Unterminated string')
   if (currentToken.length) tokens.push(quoteLang.nonliteral(currentToken))
   return tokens
@@ -129,7 +129,7 @@ const parseQuotes = x => {
 
 const parse = compose(
   parseTokens,
-  parseDelims(['()', '[]']),
+  parseDelims(['()', '[]', '{}']),
   parseQuotes,
 )
 
