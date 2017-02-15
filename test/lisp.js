@@ -2,7 +2,7 @@ import test from 'ava'
 
 import {parse} from '..'
 
-const parseLisp = x => {
+const parseLisp = s => {
   const translate = x => {
     if (Array.isArray(x)) {
       return x.filter(({type}) => type !== 'linebreak').map(translate)
@@ -15,7 +15,7 @@ const parseLisp = x => {
     if (type === 'string') return JSON.stringify(value)
     return value
   }
-  return translate(parse(x))
+  return translate(parse(s))
 }
 
 const stringifyLisp = xs => {
