@@ -1,7 +1,7 @@
 import test from 'ava'
-import {clone, includes, min, last} from 'lodash/fp'
+import {reject, last} from 'lodash/fp'
 
-import {parse, listSplit} from '..'
+import {parse, listSplit, groupOperators} from '..'
 
 const PRECEDENCE = {
   '*': 1,
@@ -9,30 +9,11 @@ const PRECEDENCE = {
   '+': 2,
   '-': 2,
 }
+const PREFIX = ['-', '$']
+const ALL_OPS = [...Object.keys(PRECEDENCE), ...PREFIX]
+const groupOps = groupOperators(PRECEDENCE, PREFIX)
 
 const parseExcel = s => {
-  const groupOperators = xs => {
-    const ops = xs.filter(({type}) => type === 'operator')
-    if (!ops.length) return xs
-    const minPrecedence = min(ops.map(({value}) => PRECEDENCE[value]))
-    const minLoc = xs.findIndex(({type, value}) => (
-      type === 'operator' && PRECEDENCE[value] === minPrecedence
-    ))
-    const selectedOp = xs[minLoc]
-    if (minLoc < 1 || minLoc > xs.length - 2) {
-      throw new Error(`Unexpected operator ${selectedOp}.`)
-    }
-    const newExprs = clone(xs)
-    newExprs.splice(minLoc - 1, 3, {
-      type: 'group',
-      value: [
-        {type: 'symbol', value: selectedOp.value},
-        {type: 'group', value: [xs[minLoc - 1], {type: 'comma'}, xs[minLoc + 1]]},
-      ],
-    })
-    return groupOperators(newExprs)
-  }
-
   const getArgBody = ({value}) => {
     const argChunks = listSplit(({type}) => type === 'comma')(value)
     return argChunks.map(translate)
@@ -50,8 +31,10 @@ const parseExcel = s => {
   const translate = x => {
     if (Array.isArray(x)) {
       if (x.length === 1) return translate(x[0])
-      const grouped = groupOperators(x)
+      const grouped = groupOps(x)
       if (grouped.length === 1) return translate(grouped[0])
+
+      // At this point, multiple tokens means function invocation.
       const [{type}, ...rest] = grouped
       if (type !== 'symbol') throw new Error(`Expected symbol, found ${type}.`)
       const invalidToken = rest.find(({type: t}) => t !== 'group')
@@ -64,9 +47,10 @@ const parseExcel = s => {
     return x
   }
 
+  const isLinebreak = ({type}) => type === 'linebreak'
   const retoken = x => {
     if (Array.isArray(x)) {
-      return x.filter(({type}) => type !== 'linebreak').map(retoken)
+      return reject(isLinebreak, x).map(retoken)
     }
     const {type, value, delim} = x
     if (type === 'group') {
@@ -75,7 +59,7 @@ const parseExcel = s => {
     }
     if (type === 'punctuation') {
       if (value === ',') return {type: 'comma'}
-      if (includes(value, ['+', '*', '-', '/'])) {
+      if (ALL_OPS.includes(value)) {
         return {type: 'operator', value}
       }
       throw new Error(`Unexpected ${value}.`)
@@ -83,7 +67,9 @@ const parseExcel = s => {
     return x
   }
 
-  return translate(retoken(parse(s)))
+  const retokenAll = xs => listSplit(isLinebreak)(xs).map(retoken)
+
+  return translate(retokenAll(parse(s)))
 }
 
 const same = (t, a, b) => {
@@ -92,3 +78,5 @@ const same = (t, a, b) => {
 same.title = (a, b) => `parses \`${a}\` and \`${b}\` the same`
 
 test('parse', same, 'A(1 + 2 * 3, "ABC")', 'A(1 + (2 * 3), "ABC")')
+test('parse', same, '(-1) + 2', '-1 + 2')
+test('parse', same, '($AAPL) + 2', '$AAPL + 2')
