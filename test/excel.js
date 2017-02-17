@@ -12,6 +12,7 @@ const PRECEDENCE = {
 const PREFIX = ['-', '$']
 const ALL_OPS = [...Object.keys(PRECEDENCE), ...PREFIX]
 const groupOps = groupOperators(PRECEDENCE, PREFIX)
+const isLinebreak = ({type}) => type === 'linebreak'
 
 const parseExcel = s => {
   const getArgBody = ({value}) => {
@@ -47,7 +48,6 @@ const parseExcel = s => {
     return x
   }
 
-  const isLinebreak = ({type}) => type === 'linebreak'
   const retoken = x => {
     if (Array.isArray(x)) {
       return reject(isLinebreak, x).map(retoken)
@@ -68,8 +68,7 @@ const parseExcel = s => {
   }
 
   const retokenAll = xs => listSplit(isLinebreak)(xs).map(retoken)
-
-  return translate(retokenAll(parse(s)))
+  return retokenAll(parse(s)).map(translate)
 }
 
 const same = (t, a, b) => {
