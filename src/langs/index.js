@@ -1,0 +1,1 @@
+export parseExcel from './excel'
