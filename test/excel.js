@@ -2,16 +2,15 @@ import test from 'ava'
 
 import {parseExcel} from '..'
 
-const same = (t, a) => {
-  console.log(JSON.stringify(parseExcel(a), null, 2))
+const parses = (t, a) => {
   t.truthy(parseExcel(a))
 }
-same.title = a => `parses \`${a}\``
+parses.title = a => `parses \`${a}\``
 
-test('parse', same, 'A(1 + 2 * 3, "ABC")')
-test('parse', same, '(-1) + 2')
-test('parse', same, '($AAPL) + 2')
-test('parse', same, '$("^FTSE", "LN")')
-test('parse', same, 'a = [1, 3]')
-test('parse', same, 'a = {a = 1, b = 2}')
-test('parse', same, 'u = ()')
+test('parse', parses, 'A(1 + 2 * 3, "ABC")')
+test('parse', parses, '(-1) + 2')
+test('parse', parses, '($AAPL) + 2')
+test('parse', parses, '$("^FTSE", "LN")')
+test('parse', parses, 'a = [1, 3]')
+test('parse', parses, 'a = {a = 1, b = 2}')
+test('parse', parses, 'u = ()')
