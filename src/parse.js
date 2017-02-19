@@ -27,7 +27,7 @@ const parseTokens = exprs => {
     ['number', /[0-9]+("."[0-9]+)?/],
     ['symbol', /[A-Za-z_]([A-Za-z0-9_]+)?/],
     ['linebreak', /\n+/],
-    ['punctuation', /[^A-Za-z0-9_]/],
+    ['punctuation', /[,*+-/><=?$:;]+/],
   ]
   const tokenize = x => {
     if (x === '') return []
