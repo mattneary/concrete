@@ -25,7 +25,7 @@ const tokenLang = {
 const parseTokens = exprs => {
   const tokenGroups = [
     ['number', /[0-9]+("."[0-9]+)?/],
-    ['symbol', /[A-Za-z_][A-Za-z0-9_]*/],
+    ['symbol', /[A-Za-z_]([A-Za-z0-9_]+)?/],
     ['linebreak', /\n+/],
     ['punctuation', /[^A-Za-z0-9_]/],
   ]

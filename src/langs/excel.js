@@ -54,6 +54,7 @@ const parseExcel = s => {
 
   const translate = x => {
     if (Array.isArray(x)) {
+      if (x.length === 0) return ['unit']
       if (x.length === 1) return translate(x[0])
       const grouped = groupOps(x)
       if (grouped.length === 1) return translate(grouped[0])
@@ -72,7 +73,6 @@ const parseExcel = s => {
     if (type === 'number') return ['number', parseFloat(value)]
     if (type === 'string') return ['string', value]
     if (type === 'symbol') return ['symbol', value]
-    if (type === 'unit') return ['unit']
     throw new Error(`Unexpected token of type ${type}.`)
   }
 
@@ -82,10 +82,7 @@ const parseExcel = s => {
     }
     const {type, value, delim} = x
     if (type === 'group') {
-      if (delim === '(') {
-        if (value.length === 0) return {type: 'unit'}
-        return {type, value: retoken(value)}
-      }
+      if (delim === '(') return {type, value: retoken(value)}
       if (delim === '[') return {type: 'list', value: retoken(value)}
       if (delim === '{') return {type: 'block', value: retokenAll(value)}
       throw new Error(`Unexpected ${delim}.`)
