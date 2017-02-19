@@ -53,7 +53,7 @@ const parseTokens = exprs => {
 }
 
 const parseDelims = delims => x => {
-  const isDelim = c => delims.join('').indexOf(c) !== -1
+  const isDelim = c => c && delims.join('').indexOf(c) !== -1
   const isOpen = c => isDelim(c) && delims.join('').indexOf(c) % 2 === 0
   const obverse = assign(
     fromPairs(delims.map(toArray)),

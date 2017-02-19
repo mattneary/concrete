@@ -20,3 +20,4 @@ test('parse', parses, `
 `)
 test('parse', parses, '[A, 1, "ABC"]', '[A , 1 , "ABC"]')
 test('parse', parses, '{a: 1, b: 2}', '{a : 1 , b : 2}')
+test('parse', parses, 'a + ""', 'a + ""')
