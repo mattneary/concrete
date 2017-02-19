@@ -48,6 +48,7 @@ export const groupOperators = (precedence, prefix) => expr => {
   // tokenLang.
   const recurse = xs => {
     const isConsecutive = (x, i) => isOp(x) && (i === 0 || isOp(xs[i - 1]))
+    const isOpArray = xs.map(isOp)
     const ops = xs.filter(isOp)
     if (!ops.length) return xs
     const consecutiveOps = xs.map(isConsecutive)
@@ -61,9 +62,16 @@ export const groupOperators = (precedence, prefix) => expr => {
         throw new Error(`Expected a value following ${selectedOp.value}.`)
       }
       const newExprs = clone(xs)
-      newExprs.splice(prefixIndex, 2, [
+      const nextOpIndex = isOpArray.indexOf(true, prefixIndex + 1)
+      const rewriteCount = nextOpIndex === -1
+        ? xs.length - prefixIndex
+        : nextOpIndex - prefixIndex
+      const governed = nextOpIndex === -1
+        ? xs.slice(prefixIndex + 1)
+        : xs.slice(prefixIndex + 1, rewriteCount)
+      newExprs.splice(prefixIndex, rewriteCount, [
         {type: 'symbol', value: selectedOp.value},
-        {type: 'group', value: [xs[prefixIndex + 1]]},
+        {type: 'group', value: governed},
       ])
       return recurse(newExprs)
     }
@@ -76,9 +84,21 @@ export const groupOperators = (precedence, prefix) => expr => {
       throw new Error(`Unexpected operator ${selectedOp.value}.`)
     }
     const newExprs = clone(xs)
-    newExprs.splice(minLoc - 1, 3, [
-      {type: 'symbol', value: selectedOp.value},
-      {type: 'group', value: [xs[minLoc - 1], {type: 'comma'}, xs[minLoc + 1]]},
+    const nextOpIndex = isOpArray.indexOf(true, minLoc + 1)
+    const prevOpIndex = isOpArray.slice(0, minLoc).lastIndexOf(true)
+    const rewriteRightCount = nextOpIndex === -1
+      ? xs.length - minLoc
+      : nextOpIndex - minLoc - 1
+    const governedRight = nextOpIndex === -1
+      ? xs.slice(minLoc + 1)
+      : xs.slice(minLoc + 1, rewriteRightCount + minLoc + 1)
+    const rewriteLeftCount = prevOpIndex === -1
+      ? minLoc
+      : minLoc - prevOpIndex - 1
+    const governedLeft = xs.slice(minLoc - rewriteLeftCount, minLoc)
+    newExprs.splice(minLoc - rewriteLeftCount, 1 + rewriteLeftCount + rewriteRightCount, [
+        {type: 'symbol', value: selectedOp.value},
+        {type: 'group', value: [...governedLeft, {type: 'comma'}, ...governedRight]},
     ])
     return recurse(newExprs)
   }
