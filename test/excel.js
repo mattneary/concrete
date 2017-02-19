@@ -1,5 +1,5 @@
 import test from 'ava'
-import {reject, last} from 'lodash/fp'
+import {last} from 'lodash/fp'
 
 import {parse, listSplit, groupOperators} from '..'
 
@@ -8,11 +8,20 @@ const PRECEDENCE = {
   '/': 1,
   '+': 2,
   '-': 2,
+  '=': 3,
+  '<=': 3,
+  '<': 3,
+  '>=': 3,
+  '>': 3,
+  '?=': 3,
+  '<>': 3,
 }
 const PREFIX = ['-', '$']
 const ALL_OPS = [...Object.keys(PRECEDENCE), ...PREFIX]
 const groupOps = groupOperators(PRECEDENCE, PREFIX)
-const isLinebreak = ({type}) => type === 'linebreak'
+const isLinebreak = ({type, value}) => (
+  type === 'linebreak' || (type === 'punctuation' && [';', ','].includes(value))
+)
 
 const parseExcel = s => {
   const getArgBody = ({value}) => {
@@ -21,12 +30,27 @@ const parseExcel = s => {
   }
 
   const nestApplications = xs => {
-    if (xs.length === 1) return xs[0]
-    return {
-      type: 'invocation',
-      fn: nestApplications(xs.slice(0, -1)),
-      args: getArgBody(last(xs)),
+    if (xs.length === 1) return translate(xs[0])
+    const fn = nestApplications(xs.slice(0, -1))
+    if (fn[0] === 'symbol' && fn[1] === '$') {
+      // TODO: handle the various call formats
+      const {value: [arg]} = last(xs)
+      if (arg.type === 'group') {
+        return ['entity', ...getArgBody(arg)]
+      }
+      if (['symbol', 'string'].includes(arg.type)) {
+        return ['entity', ['string', arg.value]]
+      }
+      throw new Error('Invalid entity expression.')
     }
+    const args = getArgBody(last(xs))
+    if (fn[0] === 'symbol' && fn[1] === '=') {
+      if (args[0][0] !== 'symbol') {
+        throw new Error(`Assign to symbol, not ${args[0][0]}.`)
+      }
+      return ['assignment', args[0][1], args[1]]
+    }
+    return ['call', fn, ...args]
   }
 
   const translate = x => {
@@ -43,19 +67,29 @@ const parseExcel = s => {
       throw new Error(`Unexpected expression of type ${invalidToken.type}.`)
     }
     const {type, value} = x
+    if (type === 'list') return ['list', ...getArgBody(x)]
     if (type === 'group') return translate(value)
-    if (type === 'number') return {type, value: parseFloat(value)}
-    return x
+    if (type === 'block') return ['block', value.map(translate)]
+    if (type === 'number') return ['number', parseFloat(value)]
+    if (type === 'string') return ['string', value]
+    if (type === 'symbol') return ['symbol', value]
+    if (type === 'unit') return ['unit']
+    throw new Error(`Unexpected token of type ${type}.`)
   }
 
   const retoken = x => {
     if (Array.isArray(x)) {
-      return reject(isLinebreak, x).map(retoken)
+      return x.filter(({type}) => type !== 'linebreak').map(retoken)
     }
     const {type, value, delim} = x
     if (type === 'group') {
-      if (delim !== '(') throw new Error(`Unexpected ${delim}.`)
-      return {type, value: retoken(value)}
+      if (delim === '(') {
+        if (value.length === 0) return {type: 'unit'}
+        return {type, value: retoken(value)}
+      }
+      if (delim === '[') return {type: 'list', value: retoken(value)}
+      if (delim === '{') return {type: 'block', value: retokenAll(value)}
+      throw new Error(`Unexpected ${delim}.`)
     }
     if (type === 'punctuation') {
       if (value === ',') return {type: 'comma'}
@@ -71,11 +105,16 @@ const parseExcel = s => {
   return retokenAll(parse(s)).map(translate)
 }
 
-const same = (t, a, b) => {
-  t.deepEqual(parseExcel(a), parseExcel(b))
+const same = (t, a) => {
+  console.log(JSON.stringify(parseExcel(a), null, 2))
+  t.truthy(parseExcel(a))
 }
-same.title = (a, b) => `parses \`${a}\` and \`${b}\` the same`
+same.title = a => `parses \`${a}\``
 
-test('parse', same, 'A(1 + 2 * 3, "ABC")', 'A(1 + (2 * 3), "ABC")')
-test('parse', same, '(-1) + 2', '-1 + 2')
-test('parse', same, '($AAPL) + 2', '$AAPL + 2')
+test('parse', same, 'A(1 + 2 * 3, "ABC")')
+test('parse', same, '(-1) + 2')
+test('parse', same, '($AAPL) + 2')
+test('parse', same, '$("^FTSE", "LN")')
+test('parse', same, 'a = [1, 3]')
+test('parse', same, 'a = {a = 1, b = 2}')
+test('parse', same, 'u = ()')

@@ -41,13 +41,13 @@ export const splitStatements = listSplit(({type, value}) => (
 ))
 
 const isOp = ({type}) => type === 'operator'
-const isConsecutive = (x, i) => isOp(x) && (i === 0 || isOp(xs[i - 1]))
 export const groupOperators = (precedence, prefix) => expr => {
   // Rewrite infix operator ASTs like `a + b * 2` as `+(a, *(b, 2))`.
   // Note: this function expects operators to be represented as {type:
   // 'operator', value : string}. This expression type does not exist in
   // tokenLang.
   const recurse = xs => {
+    const isConsecutive = (x, i) => isOp(x) && (i === 0 || isOp(xs[i - 1]))
     const ops = xs.filter(isOp)
     if (!ops.length) return xs
     const consecutiveOps = xs.map(isConsecutive)
@@ -73,7 +73,6 @@ export const groupOperators = (precedence, prefix) => expr => {
     ))
     const selectedOp = xs[minLoc]
     if (minLoc < 1 || minLoc === xs.length - 1) {
-      console.log(prefixIndex, consecutiveOps, xs)
       throw new Error(`Unexpected operator ${selectedOp.value}.`)
     }
     const newExprs = clone(xs)
