@@ -68,7 +68,7 @@ export const groupOperators = (precedence, prefix) => expr => {
         : nextOpIndex - prefixIndex
       const governed = nextOpIndex === -1
         ? xs.slice(prefixIndex + 1)
-        : xs.slice(prefixIndex + 1, rewriteCount)
+        : xs.slice(prefixIndex + 1, rewriteCount + prefixIndex)
       newExprs.splice(prefixIndex, rewriteCount, [
         {type: 'symbol', value: selectedOp.value},
         {type: 'group', value: governed},

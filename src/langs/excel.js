@@ -69,7 +69,7 @@ const parseExcel = s => {
     const {type, value} = x
     if (type === 'list') return ['list', ...getArgBody(x)]
     if (type === 'group') return translate(value)
-    if (type === 'block') return ['block', value.map(translate)]
+    if (type === 'block') return ['block', ...value.map(translate)]
     if (type === 'number') return ['number', parseFloat(value)]
     if (type === 'string') return ['string', value]
     if (type === 'symbol') return ['symbol', value]
