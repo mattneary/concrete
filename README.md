@@ -14,8 +14,8 @@ group : {type: 'group', value : [expr], delim: '(' | '[' | '{'}
 string : {type: 'string', value : string}
 number : {type: 'number', value : string}
 punctuation : {type: 'punctuation', value : string}
-linebreak : {type: 'punctuation', value : string}
-symbol : {type: 'string', value : string}
+linebreak : {type: 'linebreak', value : string}
+symbol : {type: 'symbol', value : string}
 ```
 
 See the `test/` directory for an example of parsing lisp.
